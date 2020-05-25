@@ -9,8 +9,11 @@
 
 //the sound for the radiojammer
 #define SOUND_JAMMER "ttt_clwo/Smoke Grenade Sound Effect.mp3"
+#define MAXENTITIES 2048
 
 int g_iActiveBoxes = 0;
+int SmokeOfBox[MAXENTITIES];
+int g_iFog = -1;
 
 enum struct PlayerData 
 {
@@ -49,9 +52,9 @@ public void OnPluginStart()
 {
     g_cRangeEnabled = AutoExecConfig_CreateConVar("ttt_box_range_enable", "1", "Sets whether range of the radio jammer is enabled");
     g_cFogRange = AutoExecConfig_CreateConVar("ttt_box_mute_range", "1000", "The range within a player get fogged by the radio jammer");
-    g_cCeaseTime = AutoExecConfig_CreateConVar("ttt_box_cease_time", "10.0", "The time the radio jammer stops working");
+    g_cCeaseTime = AutoExecConfig_CreateConVar("ttt_box_cease_time", "60.0", "The time the radio jammer stops working");
     RegConsoleCmd("sm_spawnbox", Command_SpawnBox, "Spawns a Black Box Of Death");
-    HookEvent("round_prestart", Event_RoundStartPre, EventHookMode_Pre);
+    HookEvent("round_end", Event_RoundEnd);
 }
 
 public void OnMapStart()
@@ -64,16 +67,45 @@ public void OnMapStart()
         g_iPlayer[i].foggedByBox = false;
         g_iPlayer[i].BoxStoppped = false;
     }
+
+    int iEnt = -1;
+    iEnt = FindEntityByClassname(-1, "env_fog_controller");
+    
+    if (IsValidEntity(iEnt)) 
+    {
+        g_iFog = iEnt;
+    }
+    else
+    {
+        g_iFog = CreateEntityByName("env_fog_controller");
+        DispatchSpawn(g_iFog);
+    }
+    SetupBlackout();
 }
 
-public Action CS_OnTerminateRound(float &delay, CSRoundEndReason &reason)
+public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
-    AllClientReset();
+    LoopClients(i)
+    {
+        ClientReset(i);
+        if (HasFlag(g_iActiveBoxes, i) == true)
+        {
+            DestroyBox(i);
+            AcceptEntityInput(g_iFog, "TurnOff");
+            DispatchKeyValueFloat(g_iFog, "farz", 0.0);
+            
+        }
+    }
+
 }
 
 public Action Event_RoundStartPre(Event event, const char[] name, bool dontBroadcast)
 {
-    AllClientReset();
+    LoopClients(i)
+    {
+        ClientReset(i);
+    }
+    SetupBlackout();
 }
 
 Action Command_SpawnBox(int client, int args)
@@ -135,12 +167,13 @@ public void CreateBox(int client)
         g_iPlayer[client].BoxPosition = vPos;
 
         int SmokeIndex = CreateEntityByName("env_particlesmokegrenade" );
-        SetEntProp(SmokeIndex, Prop_Send, "m_CurrentStage", 1);
+        SetEntProp(SmokeIndex, Prop_Send, "m_CurrentStage", 2);
         SetEntPropFloat(SmokeIndex, Prop_Send, "m_FadeStartTime", 0.0);
         SetEntPropFloat(SmokeIndex, Prop_Send, "m_FadeEndTime", (g_cCeaseTime.FloatValue+5.0));
         DispatchSpawn(SmokeIndex);
         ActivateEntity(SmokeIndex);
         TeleportEntity(SmokeIndex, g_iPlayer[client].BoxPosition, NULL_VECTOR, NULL_VECTOR);
+        SmokeOfBox[entity] = SmokeIndex;
 
         if (g_cRangeEnabled.BoolValue == false)
         {
@@ -180,8 +213,10 @@ public void OnEntityDestroyed(int entity)
     {
         if(g_iPlayer[i].ClientBox == entity && g_iPlayer[i].BoxStoppped == false)
         {
+            SetEntPropFloat(SmokeOfBox[entity], Prop_Send, "m_FadeEndTime", (0.0));
             TTT_ClearTimer(g_iPlayer[i].hBoxEnd);
             TTT_ClearTimer(g_iPlayer[i].hLoopSound);
+            g_iPlayer[i].BoxStoppped = true;
             StopSound(entity, SNDCHAN_AUTO, SOUND_JAMMER);
             PrintToChatAll("The radio jammer has been destroyed!");
             SetFlag(g_iActiveBoxes, i, false);
@@ -189,7 +224,9 @@ public void OnEntityDestroyed(int entity)
             {
                 if (g_iPlayer[x].foggedByBox == true && g_iActiveBoxes == 0)
                 {
-                    SetClientListeningFlags(x, VOICE_NORMAL);
+                    //SetClientListeningFlags(x, VOICE_NORMAL);
+                    AcceptEntityInput(g_iFog, "TurnOff");
+                    DispatchKeyValueFloat(g_iFog, "farz", 0.0);
                     g_iPlayer[x].foggedByBox = false;
                     PrintToChat(x, "You are unfogged!");
                 }
@@ -219,7 +256,9 @@ public Action Timer_JammerEnd(Handle timer, DataPack data)
     {
         if (g_iPlayer[i].foggedByBox == true && g_iActiveBoxes == 0)
         {
-            SetClientListeningFlags(i, VOICE_NORMAL);
+            AcceptEntityInput(g_iFog, "TurnOff");
+            DispatchKeyValueFloat(g_iFog, "farz", 0.0);
+            //SetClientListeningFlags(i, VOICE_NORMAL);
             g_iPlayer[i].foggedByBox = false;
             PrintToChat(i, "You are unfogged!");
         }
@@ -231,27 +270,10 @@ public void OnGameFrame()
 {
     if (g_cRangeEnabled.BoolValue == true)
     {
-        float cPos[3];
-        LoopValidClients(y)
-        {
-            GetClientAbsOrigin(y, cPos);
-            LoopValidClients(x)
-            {
-                if (HasFlag(g_iActiveBoxes, x))
-                {
-                    float Distance = GetVectorDistance(cPos, g_iPlayer[x].BoxPosition);
-                    if (Distance <= g_cFogRange.IntValue)
-                    {
-                        g_iPlayer[y].InRangeAllBoxes[x] = true;
-                    }
+        EntityPositionRefresh();
 
-                    else if (Distance >= g_cFogRange.IntValue)
-                    {
-                        g_iPlayer[y].InRangeAllBoxes[x] = false;
-                    }
-                }
-            }
-        }
+        /*
+        ~ Probs some useless code =(
         LoopValidClients(a)
         {
             LoopValidClients(b)
@@ -268,26 +290,12 @@ public void OnGameFrame()
                 }
             }
         }
+        */
 
-        LoopValidClients(i)
-        {
-            if (g_iPlayer[i].foggedByBox == false && IsPlayerAlive(i) && g_iPlayer[i].InRange == true /*&& !BaseComm_IsClientMuted(i)  && SourceComms_GetClientMuteType(i) != bNot*/ )
-            {
-                SetClientListeningFlags(i, VOICE_MUTED);
-                g_iPlayer[i].foggedByBox = true;
-                PrintToChat(i, "You are fogged!");
-                PrintToChat(i, "You are in the range of the radio jammer!");
-                break;
-            }
+        InRangeChecker();
 
-            else if (g_iPlayer[i].foggedByBox == true && g_iPlayer[i].InRange == false && g_iPlayer[i].foggedByBox == true)
-            {
-                SetClientListeningFlags(i, VOICE_NORMAL);
-                g_iPlayer[i].foggedByBox = false;
-                PrintToChat(i, "You are unfogged!");
-                PrintToChat(i, "You are out the range of the radio jammer!");
-            }
-        }
+        InRangeFogger();
+        
     }
 }
 
@@ -302,9 +310,81 @@ public Action TTT_OnClientDeathPre(int client)
 {
     if (g_iPlayer[client].foggedByBox == true)
     {
-        SetClientListeningFlags(client, VOICE_NORMAL);
+        //SetClientListeningFlags(client, VOICE_NORMAL);
+        AcceptEntityInput(g_iFog, "TurnOff");
+        DispatchKeyValueFloat(g_iFog, "farz", 0.0);
         g_iPlayer[client].foggedByBox = false;
         PrintToChat(client, "You are unfogged!");
+    }
+}
+
+void InRangeChecker()
+{
+    float cPos[3];
+    LoopValidClients(y)
+    {
+        GetClientAbsOrigin(y, cPos);
+        LoopValidClients(x)
+        {
+            float Distance = GetVectorDistance(cPos, g_iPlayer[x].BoxPosition);
+            if (Distance <= g_cFogRange.IntValue && HasFlag(g_iActiveBoxes, x))
+            {
+                g_iPlayer[y].InRange = true;
+                break;
+            }
+
+            else
+            {
+                g_iPlayer[y].InRange = false;
+            }
+        }
+    }
+}
+
+void InRangeFogger()
+{
+    LoopValidClients(i)
+    {
+        if (g_iPlayer[i].foggedByBox == false && IsPlayerAlive(i) && g_iPlayer[i].InRange == true /*&& !BaseComm_IsClientMuted(i)  && SourceComms_GetClientMuteType(i) != bNot*/ )
+        {
+            //SetClientListeningFlags(i, VOICE_MUTED);
+            AcceptEntityInput(g_iFog, "TurnOn");
+            DispatchKeyValueFloat(g_iFog, "farz", 125.0);
+            g_iPlayer[i].foggedByBox = true;
+            PrintToChat(i, "You are fogged!");
+            PrintToChat(i, "You are in the range of the radio jammer!");
+            break;
+        }
+
+        else if (g_iPlayer[i].foggedByBox == true && g_iPlayer[i].InRange == false && g_iPlayer[i].foggedByBox == true)
+        {
+            //SetClientListeningFlags(i, VOICE_NORMAL);
+            AcceptEntityInput(g_iFog, "TurnOff");
+            DispatchKeyValueFloat(g_iFog, "farz", 0.0);
+            g_iPlayer[i].foggedByBox = false;
+            PrintToChat(i, "You are unfogged!");
+            PrintToChat(i, "You are out the range of the radio jammer!");
+        }
+    }
+}
+
+void EntityPositionRefresh()
+{
+    LoopClients(i)
+    {
+        if (HasFlag(g_iActiveBoxes, i))
+        {
+            float EntityPosition[3];
+            GetEntPropVector(g_iPlayer[i].ClientBox, Prop_Send, "m_vecOrigin", EntityPosition);
+            for (int x = 0; x <= 2; x++)
+            {
+                if (EntityPosition[x] != g_iPlayer[i].BoxPosition[x])
+                {
+                    g_iPlayer[i].BoxPosition = EntityPosition;
+                    TeleportEntity(SmokeOfBox[g_iPlayer[i].ClientBox], EntityPosition, NULL_VECTOR, NULL_VECTOR);
+                }
+            }
+        }
     }
 }
 
@@ -314,7 +394,9 @@ void ClientReset(int client)
     //{
     //  SetClientListeningFlags(i, VOICE_NORMAL);
     //}
-
+    
+    AcceptEntityInput(g_iFog, "TurnOff");
+    DispatchKeyValueFloat(g_iFog, "farz", 0.0);
     TTT_ClearTimer(g_iPlayer[client].hBoxEnd);
     TTT_ClearTimer(g_iPlayer[client].hLoopSound);
 
@@ -322,27 +404,6 @@ void ClientReset(int client)
     SetFlag(g_iActiveBoxes, client, false);
     g_iPlayer[client].BoxStoppped = true;
 }
-
-void AllClientReset()
-{
-    LoopValidClients(i)
-    {
-        //if (!BaseComm_IsClientMuted(i)/* || SourceComms_GetClientMuteType(i) != bNot*/)
-        //{
-        //SetClientListeningFlags(i, VOICE_NORMAL);
-        //}
-
-        TTT_ClearTimer(g_iPlayer[i].hBoxEnd);
-        TTT_ClearTimer(g_iPlayer[i].hLoopSound);
-
-        g_iPlayer[i].foggedByBox = false;
-        SetFlag(g_iActiveBoxes, i, false);
-        g_iPlayer[i].BoxStoppped = true;
-    }
-}
-
-/*
-~ MAYBE BEING USED IN THE FUTURE
 
 void DestroyBox(int client)
 {
@@ -354,7 +415,6 @@ void DestroyBox(int client)
     PrintToChatAll("The radio jammer has been Removed!");
 
 }
-*/
 
 bool HasFlag(int flag, int index)
 {
@@ -370,6 +430,23 @@ bool SetFlag(int &flag, int index, bool value)
     else
     {
         flag &= ~(1 << index);
+    }
+}
+
+void SetupBlackout()
+{
+    if(IsValidEntity(g_iFog))
+    {
+        DispatchSpawn(g_iFog);
+        DispatchKeyValue(g_iFog, "fogblend", "0");
+        DispatchKeyValue(g_iFog, "fogcolor", "0 0 0");
+        DispatchKeyValue(g_iFog, "fogcolor2", "0 0 0");
+        DispatchKeyValueFloat(g_iFog, "fogstart", 0.0);
+        DispatchKeyValueFloat(g_iFog, "fogend", 100.0);
+        DispatchKeyValueFloat(g_iFog, "fogmaxdensity", 1.0);
+        DispatchKeyValueFloat(g_iFog, "farz", 0.0);
+        DispatchKeyValue(g_iFog, "fogenable", "yes");
+        AcceptEntityInput(g_iFog, "TurnOff");
     }
 }
 
