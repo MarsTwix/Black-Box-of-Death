@@ -1,16 +1,16 @@
-#if defined blackboxofdeath_core_included
+#if defined fogbox_core_included
  #endinput
 #endif
 
-#define _blackboxofdeath_core_included
+#define _fogbox_core_included
 
 native void CreateBox(int client);
 native void RemoveBox(int client);
 
 public SharedPlugin __pl_turret_core = 
 {
-    name = "blackboxofdeath_core",
-    file = "blackboxofdeath_core.smx",
+    name = "fogbox_core",
+    file = "fogbox_core.smx",
 #if defined REQUIRE_PLUGIN
     required = 1,
 #else
@@ -19,7 +19,7 @@ public SharedPlugin __pl_turret_core =
 };
 
 #if !defined REQUIRE_PLUGIN
-public void __pl_blackboxofdeath_core_SetNTVOptional()
+public void __pl_fogbox_core_SetNTVOptional()
 {
     MarkNativeAsOptional("CreateBox");
 }

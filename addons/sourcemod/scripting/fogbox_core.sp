@@ -43,7 +43,7 @@ ConVar g_cCeaseTime = null;
  
 public Plugin myinfo =
 {
-    name = "Black Box Of Death",
+    name = "Fog Box",
     author = "MarsTwix & C0rp3n",
     description = "This plugin fogs people who are in range, exclusive to the ones that are immune to the fog",
     version = "1.0.0",
@@ -57,8 +57,8 @@ public void OnPluginStart()
     g_cFogRange = AutoExecConfig_CreateConVar("ttt_box_mute_range", "1000", "The range within a player get fogged by the box");
     g_cCeaseTime = AutoExecConfig_CreateConVar("ttt_box_cease_time", "30.0", "The time the box stops working");
 
-    RegConsoleCmd("sm_spawnbox", Command_SpawnBox, "Spawns a Black Box Of Death");
-    RegConsoleCmd("sm_clearbox", Command_ClearBox, "Clears a Black Box Of Death of a client");
+    RegConsoleCmd("sm_spawnbox", Command_SpawnBox, "Spawns a Fog Box");
+    RegConsoleCmd("sm_clearbox", Command_ClearBox, "Clears a Fog Box of a client");
 
     RegConsoleCmd("sm_vars", Command_Vars, "Show variables of client or given target");
 
@@ -90,7 +90,7 @@ public void OnMapStart()
         g_iFog = CreateEntityByName("env_fog_controller");
         DispatchSpawn(g_iFog);
     }
-    SetupBlackout();
+    SetupFog();
 }
 
 public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
@@ -101,7 +101,6 @@ public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
         if (HasFlag(g_iActiveBoxes, i) == true)
         {
             DestroyBox(i);
-            AcceptEntityInput(g_iFog, "TurnOff");
             g_iPlayer[i].ShowFog = false;
             DispatchKeyValueFloat(g_iFog, "farz", 0.0);
             
@@ -123,7 +122,6 @@ public void OnClientPutInServer(int client)
     g_iPlayer[client].hBoxEnd = INVALID_HANDLE;
     g_iPlayer[client].hLoopSound = INVALID_HANDLE;
     ClientReset(client);
-    AcceptEntityInput(g_iFog, "TurnOff");
     g_iPlayer[client].ShowFog = false;
 }
 
@@ -256,6 +254,10 @@ public void CreateBox(int client)
         DispatchSpawn(entity);
         TeleportEntity(entity, vPos, NULL_VECTOR, NULL_VECTOR);
 
+        SetEdictFlags(g_iFog, GetEdictFlags(g_iFog)&(~FL_EDICT_ALWAYS));
+        SDKHook(g_iFog, SDKHook_SetTransmit, Hook_SetTransmit);
+        AcceptEntityInput(g_iFog, "TurnOn");
+
         //add a sound to the entity
         EmitSoundToAll(SND_BOX, entity);
 
@@ -338,7 +340,6 @@ public void OnEntityDestroyed(int entity)
             {
                 if (g_iPlayer[x].foggedByBox == true && g_iActiveBoxes == 0)
                 {   
-                    AcceptEntityInput(g_iFog, "TurnOff");
                     g_iPlayer[x].ShowFog = false;
                     DispatchKeyValueFloat(g_iFog, "farz", 0.0);
                     g_iPlayer[x].foggedByBox = false;
@@ -380,7 +381,6 @@ public Action Timer_JammerEnd(Handle timer, DataPack data)
         if (g_iPlayer[i].foggedByBox == true && g_iActiveBoxes == 0)
         {
 
-            AcceptEntityInput(g_iFog, "TurnOff");
             g_iPlayer[client].ShowFog = false;
             DispatchKeyValueFloat(g_iFog, "farz", 0.0);
             g_iPlayer[i].foggedByBox = false;
@@ -419,7 +419,6 @@ public Action TTT_OnClientDeathPre(int client)
     {
         char name[32], time[16];
 
-        AcceptEntityInput(g_iFog, "TurnOff");
         g_iPlayer[client].ShowFog = false;
         DispatchKeyValueFloat(g_iFog, "farz", 0.0);
         g_iPlayer[client].foggedByBox = false;
@@ -489,9 +488,7 @@ void InRangeFogger()
         {
             char name[32], time[16];
 
-            AcceptEntityInput(g_iFog, "TurnOn");
             g_iPlayer[i].ShowFog = true;
-            SDKHook(g_iFog, SDKHook_SetTransmit, Hook_SetTransmit);
             DispatchKeyValueFloat(g_iFog, "farz", 125.0);
             g_iPlayer[i].foggedByBox = true;
 
@@ -500,13 +497,11 @@ void InRangeFogger()
             PrintToConsoleAll(debug ... "[%s] %s got fogged, because in the range of the box", time, name);
         }
 
-        else if (g_iPlayer[i].foggedByBox == true && g_iPlayer[i].InRange == false && g_iPlayer[i].foggedByBox == true)
+        else if (g_iPlayer[i].foggedByBox == true && g_iPlayer[i].InRange == false)
         {
             char name[32], time[16];
 
-            AcceptEntityInput(g_iFog, "TurnOff");
             g_iPlayer[i].ShowFog = false;
-            SDKHook(g_iFog, SDKHook_SetTransmit, Hook_SetTransmit);
             DispatchKeyValueFloat(g_iFog, "farz", 0.0);
             g_iPlayer[i].foggedByBox = false;
 
@@ -520,7 +515,6 @@ void InRangeFogger()
 //Sets a client's settings to default
 void ClientReset(int client)
 {
-    AcceptEntityInput(g_iFog, "TurnOff");
     g_iPlayer[client].ShowFog = false;
     DispatchKeyValueFloat(g_iFog, "farz", 0.0);
     TTT_ClearTimer(g_iPlayer[client].hBoxEnd);
@@ -586,7 +580,7 @@ void SetupSmoke(int entity, int client)
 }
 
 //Creation, modeling of the fog
-void SetupBlackout()
+void SetupFog()
 {
     if(IsValidEntity(g_iFog))
     {
@@ -599,21 +593,31 @@ void SetupBlackout()
         DispatchKeyValueFloat(g_iFog, "fogmaxdensity", 1.0);
         DispatchKeyValueFloat(g_iFog, "farz", 0.0);
         AcceptEntityInput(g_iFog, "TurnOff");
-        SDKHook(g_iFog, SDKHook_SetTransmit, Hook_SetTransmit);
     }
 }
 
 //denies Fog for people out of the range.
 public Action Hook_SetTransmit(int entity, int client) 
 {
+    /*
     char time[16];
     FormatTime(time, sizeof(time), "%H:%M:%S", GetTime());
     PrintToConsoleAll(debug ... "[%s] SetTransmit has been reached!", time);
+    */
+    SettingEdictFlags(entity);
     if(!g_iPlayer[client].ShowFog)
     {
-		return Plugin_Stop;
+        return Plugin_Stop;
     }
     return Plugin_Continue;
+}
+
+void SettingEdictFlags(int edict)
+{
+    if (GetEdictFlags(edict) & FL_EDICT_ALWAYS)
+    {
+        SetEdictFlags(edict, (GetEdictFlags(edict) ^ FL_EDICT_ALWAYS));
+    }
 }
 
 //A native so you can use this plugin in other plugin
