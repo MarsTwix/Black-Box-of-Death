@@ -8,5 +8,10 @@
 ## Status
 *Be aware this plugin is still in development, so expect some changes and issues.*
 
+## ToDo list
+ - Optimazations
+ - Better variable names
+ - Fix not unfogging bug
+
 ## Download
  - https://github.com/MarsTwix/Fog-Box
