@@ -6,7 +6,7 @@
 </p>
 
 ## Status
-*Be aware this plugin is still in development, so expect some issues and bugs.*
+*Be aware this plugin is still in development, so expect some changes and issues.*
 
 ## Download
  - https://github.com/MarsTwix/Fog-Box
