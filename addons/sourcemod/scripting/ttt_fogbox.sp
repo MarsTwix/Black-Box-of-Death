@@ -23,9 +23,6 @@
 #define PLUGIN_URL "clwo.eu"
 
 
-//the sound for the radiojammer
-#define SOUND_JAMMER "ttt_clwo/ECM Jammer Sound Effect.mp3"
-
 //shop convars
 ConVar g_cPrice = null;
 ConVar g_cPrio = null;
@@ -52,11 +49,11 @@ public void OnPluginStart()
     TTT_LoadTranslations();
    
     TTT_StartConfig("fogbox");
-    CreateConVar("ttt2_RadioJammer_version", TTT_PLUGIN_VERSION, TTT_PLUGIN_DESCRIPTION, FCVAR_NOTIFY | FCVAR_DONTRECORD | FCVAR_REPLICATED);
-    g_cLongName = AutoExecConfig_CreateConVar("ttt_fog_box_name", "RadioJammer", "The name of this in Shop");
-    g_cPrice = AutoExecConfig_CreateConVar("ttt_fog_box_price", "1000", "The amount of credits RadioJammer costs as traitor. 0 to disable.");
-    g_cPrio = AutoExecConfig_CreateConVar("ttt_fog_box_sort_prio", "0", "The sorting priority of the RadioJammer in the shop menu.");
-    g_cCount = AutoExecConfig_CreateConVar("ttt_fog_box_count", "3", "Amount of RadioJammer purchases per round");
+    CreateConVar("ttt2_FogBox_version", TTT_PLUGIN_VERSION, TTT_PLUGIN_DESCRIPTION, FCVAR_NOTIFY | FCVAR_DONTRECORD | FCVAR_REPLICATED);
+    g_cLongName = AutoExecConfig_CreateConVar("ttt_fog_box_name", "FogBox", "The name of this in Shop");
+    g_cPrice = AutoExecConfig_CreateConVar("ttt_fog_box_price", "1000", "The amount of credits FogBox costs as traitor. 0 to disable.");
+    g_cPrio = AutoExecConfig_CreateConVar("ttt_fog_box_sort_prio", "0", "The sorting priority of the FogBox in the shop menu.");
+    g_cCount = AutoExecConfig_CreateConVar("ttt_fog_box_count", "3", "Amount of FogBox purchases per round");
     g_cActivation = AutoExecConfig_CreateConVar("ttt_fog_box_activation_mode", "1", "Which activation mode? 0 - New, over !inventory menu; 1 - Old, on purchase", _, true, 0.0, true, 1.0);
     g_cLimit = AutoExecConfig_CreateConVar("ttt_fog_box_station_limit", "0", "The amount of purchases for all players during a round.", _, true, 0.0);
     TTT_EndConfig();
