@@ -5,9 +5,9 @@
 #define _fogbox_core_included
 
 native void CreateBox(int client);
-native void RemoveBox(int client);
+//native void RemoveBox(int client);
 
-public SharedPlugin __pl_turret_core = 
+public SharedPlugin __pl_fogbox_core = 
 {
     name = "fogbox_core",
     file = "fogbox_core.smx",
