@@ -6,6 +6,7 @@
 #include <basecomm>
 #include <voiceannounce_ex>
 #include <ttt>
+#include <betterplacement>
 
 #pragma newdecls required
 
@@ -26,7 +27,7 @@ enum struct PlayerData
     //Bools
     bool InRange;
     bool MutedByRadio;
-    bool RadioStoppped;
+    bool RadioStopped;
     bool Muted;
     bool UsedMic;
 
@@ -74,7 +75,7 @@ public void OnMapStart()
     {
         SetFlag(g_iActiveRadios, i, false);
         g_iPlayer[i].MutedByRadio = false;
-        g_iPlayer[i].RadioStoppped = true;
+        g_iPlayer[i].RadioStopped = true;
         g_iPlayer[i].InRange = false;
         g_iPlayer[i].UsedMic = false;
     }
@@ -182,11 +183,11 @@ Action Command_ClearRadio(int client, int args)
 
 Action Command_SpawnRadio(int client, int args)
 {
-    CreateJammer(client);
+    CreateRadio(client);
 }
-
+/*
 //The creation of the jammer
-public void CreateJammer(int client)
+public void CreateRadio(int client)
 {
     char model[PLATFORM_MAX_PATH] = "models/props/cs_office/radio.mdl";
     DataPack data;
@@ -232,14 +233,14 @@ public void CreateJammer(int client)
 
         //Saves that a client's entity is active, set it that the it didn't stop yet and save the client's jammer position.
         SetFlag(g_iActiveRadios, client, true);
-        g_iPlayer[client].RadioStoppped = false;
+        g_iPlayer[client].RadioStopped = false;
         g_iPlayer[client].RadioPosition = vPos;
 
         if (g_cRangeEnabled.BoolValue == false)
         {
             LoopValidClients(i)
             {
-                if (IsPlayerAlive(i) && (!BaseComm_IsClientMuted(i) /*|| SourceComms_GetClientMuteType(i) != bNot*/))
+                if (IsPlayerAlive(i) && (!BaseComm_IsClientMuted(i) || SourceComms_GetClientMuteType(i) != bNot))
                 {
                     SetClientListeningFlags(i, VOICE_MUTED);
                     g_iPlayer[i].MutedByRadio = true;
@@ -273,19 +274,86 @@ public void CreateJammer(int client)
         PrintToChat(client, "You already have a mute jammer running!");
     }
 }
+*/
 
+
+void CreateRadio(int client)
+{
+    if (!HasFlag(g_iActiveRadios, client))
+    {
+        BetterPlacement(client, "models/props/cs_office/radio.mdl", 1.0, 100);
+    }
+    else
+    {
+        PrintToChat(client, "You already have a RadioJammer running!");
+    }
+}
+
+public void PreEntitySpawn(int entity, int client)
+{
+    if (HasFlag(g_iActiveRadios, client))
+    {
+        LoopClients(i)
+        {
+            if (g_cRangeEnabled.BoolValue == true)
+            {
+                g_iPlayer[i].InRange = false;
+            }
+        }
+        g_iPlayer[client].ClientRadio = entity;
+    }
+}
+
+public void EntitySpawn(int entity, int client, float EntityPosition[3])
+{
+    if (!HasFlag(g_iActiveRadios, client))
+    {
+        DataPack data;
+
+        EmitSoundToAll(SND_Jammer, entity);
+
+        SetFlag(g_iActiveRadios, client, true);
+        g_iPlayer[client].RadioStopped = false;
+        g_iPlayer[client].RadioPosition = EntityPosition;
+
+        if (g_cRangeEnabled.BoolValue == false)
+        {
+            LoopValidClients(i)
+            {
+                if (IsClientInGame(i) && !IsFakeClient(i) && IsPlayerAlive(i) && (!BaseComm_IsClientMuted(i)/* || SourceComms_GetClientMuteType(i) != bNot*/))
+                {
+                    SetClientListeningFlags(i, VOICE_MUTED);
+                    g_iPlayer[i].MutedByRadio = true;
+                    PrintToChat(i, "You are muted!");
+                }
+            }
+        }   
+        PrintToChatAll("There has been a radio jammer been placed!");
+
+        g_iPlayer[client].hRadioEnd = CreateDataTimer(g_cCeaseTime.FloatValue, Timer_JammerEnd, data);
+        data.WriteCell(client);
+        data.WriteCell(entity);
+
+        if (g_cCeaseTime.FloatValue > 28.0)
+        {
+            
+            g_iPlayer[client].hLoopSound = CreateTimer(28.0, Timer_LoophLoopSound, entity, TIMER_REPEAT);
+            
+        }
+    }
+}
 //If the jammer gets destroyed it will unfog people
 public void OnEntityDestroyed(int entity)
 {
     //checking if the destroyed entity is a jammer
     LoopClients(i)
     {
-        if(g_iPlayer[i].ClientRadio == entity && g_iPlayer[i].RadioStoppped == false)
+        if(g_iPlayer[i].ClientRadio == entity && g_iPlayer[i].RadioStopped == false)
         {   
             //clear timers, like sounds and that the jammer already has been stopped
             TTT_ClearTimer(g_iPlayer[i].hRadioEnd);
             TTT_ClearTimer(g_iPlayer[i].hLoopSound);
-            g_iPlayer[i].RadioStoppped = true;
+            g_iPlayer[i].RadioStopped = true;
 
             //stop sound and set client's jammer to inactive
             StopSound(entity, SNDCHAN_AUTO, SND_Jammer);
@@ -334,7 +402,7 @@ public Action Timer_JammerEnd(Handle timer, DataPack data)
 
     SetFlag(g_iActiveRadios, client, false);
     StopSound(entity, SNDCHAN_AUTO, SND_Jammer);
-    g_iPlayer[client].RadioStoppped = true;
+    g_iPlayer[client].RadioStopped = true;
 
     //Unfog everybody if this was the last jammer
     LoopValidClients(i)
@@ -499,7 +567,7 @@ void ClientReset(int client)
 
     g_iPlayer[client].MutedByRadio = false;
     SetFlag(g_iActiveRadios, client, false);
-    g_iPlayer[client].RadioStoppped = true;
+    g_iPlayer[client].RadioStopped = true;
 }
 
 //destroys/clears the jammer of the client
