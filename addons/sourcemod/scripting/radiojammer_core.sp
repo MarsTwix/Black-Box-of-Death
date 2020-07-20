@@ -281,7 +281,7 @@ void CreateRadio(int client)
 {
     if (!HasFlag(g_iActiveRadios, client))
     {
-        BetterPlacement(client, "models/props/cs_office/radio.mdl", 1.0, 100);
+        BetterPlacement(client, "models/props/cs_office/radio.mdl", 1.0, 100, "RadioJammer");
     }
     else
     {
@@ -291,7 +291,7 @@ void CreateRadio(int client)
 
 public void PreEntitySpawn(int entity, int client)
 {
-    if (HasFlag(g_iActiveRadios, client))
+    if (HasTargetName(client, "RadioJammer"))
     {
         LoopClients(i)
         {
@@ -306,7 +306,7 @@ public void PreEntitySpawn(int entity, int client)
 
 public void EntitySpawn(int entity, int client, float EntityPosition[3])
 {
-    if (!HasFlag(g_iActiveRadios, client))
+    if (HasTargetName(client, "RadioJammer"))
     {
         DataPack data;
 
